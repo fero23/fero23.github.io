@@ -1,1 +1,1 @@
-initSidebarItems({"enum":[["BVWantedSize",""],["ByteVecError",""]]});
+initSidebarItems({"enum":[["BVExpectedSize",""],["ByteVecError",""]]});

@@ -1,1 +1,1 @@
-initSidebarItems({});
+initSidebarItems({"trait":[["BVSize","Represents the generic integral type of the structure size indicators"]]});

@@ -113,6 +113,8 @@
 <span id="69">69</span>
 <span id="70">70</span>
 <span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
 </pre><pre class='rust '>
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>str</span>::<span class='ident'>Utf8Error</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>convert</span>::<span class='ident'>From</span>;
@@ -120,20 +122,21 @@
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>fmt</span>::{<span class='self'>self</span>, <span class='ident'>Display</span>};
 
 <span class='kw'>use</span> <span class='self'>self</span>::<span class='ident'>ByteVecError</span>::<span class='op'>*</span>;
-<span class='kw'>use</span> <span class='self'>self</span>::<span class='ident'>BVWantedSize</span>::<span class='op'>*</span>;
+<span class='kw'>use</span> <span class='self'>self</span>::<span class='ident'>BVExpectedSize</span>::<span class='op'>*</span>;
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>Clone</span>, <span class='ident'>Copy</span>)]</span>
-<span class='kw'>pub</span> <span class='kw'>enum</span> <span class='ident'>BVWantedSize</span> {
-    <span class='ident'>MoreThan</span>(<span class='ident'>u32</span>),
-    <span class='ident'>EqualTo</span>(<span class='ident'>u32</span>),
+<span class='kw'>pub</span> <span class='kw'>enum</span> <span class='ident'>BVExpectedSize</span> {
+    <span class='ident'>LessOrEqualThan</span>(<span class='ident'>usize</span>),
+    <span class='ident'>MoreThan</span>(<span class='ident'>usize</span>),
+    <span class='ident'>EqualTo</span>(<span class='ident'>usize</span>),
 }
 
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>Clone</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>enum</span> <span class='ident'>ByteVecError</span> {
     <span class='ident'>StringDecodeUtf8Error</span>(<span class='ident'>Utf8Error</span>),
     <span class='ident'>BadSizeDecodeError</span> {
-        <span class='ident'>wanted</span>: <span class='ident'>BVWantedSize</span>,
-        <span class='ident'>actual</span>: <span class='ident'>u32</span>,
+        <span class='ident'>expected</span>: <span class='ident'>BVExpectedSize</span>,
+        <span class='ident'>actual</span>: <span class='ident'>usize</span>,
     },
     <span class='ident'>OverflowError</span>,
 }
@@ -142,20 +145,21 @@
     <span class='kw'>fn</span> <span class='ident'>fmt</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>f</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>fmt</span>::<span class='ident'>Formatter</span>) <span class='op'>-&gt;</span> <span class='ident'>fmt</span>::<span class='prelude-ty'>Result</span> {
         <span class='kw'>match</span> <span class='op'>*</span><span class='self'>self</span> {
             <span class='ident'>StringDecodeUtf8Error</span>(<span class='ident'>utf8_error</span>) <span class='op'>=&gt;</span> <span class='macro'>write</span><span class='macro'>!</span>(<span class='ident'>f</span>, <span class='string'>&quot;StringDecodeUtf8Error: {}&quot;</span>, <span class='ident'>utf8_error</span>),
-            <span class='ident'>BadSizeDecodeError</span> { <span class='ident'>wanted</span>, <span class='ident'>actual</span> } <span class='op'>=&gt;</span> {
+            <span class='ident'>BadSizeDecodeError</span> { <span class='ident'>expected</span>, <span class='ident'>actual</span> } <span class='op'>=&gt;</span> {
                 <span class='macro'>write</span><span class='macro'>!</span>(<span class='ident'>f</span>,
-                       <span class='string'>&quot;The size specified for the structure is {}, but the size of the given \
+                       <span class='string'>&quot;The size expected for the structure is {}, but the size of the given \
                         buffer is {}&quot;</span>,
-                       <span class='kw'>match</span> <span class='ident'>wanted</span> {
-                           <span class='ident'>MoreThan</span>(<span class='ident'>wanted</span>) <span class='op'>=&gt;</span> <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;more than {}&quot;</span>, <span class='ident'>wanted</span>),
-                           <span class='ident'>EqualTo</span>(<span class='ident'>wanted</span>) <span class='op'>=&gt;</span> <span class='ident'>wanted</span>.<span class='ident'>to_string</span>(),
+                       <span class='kw'>match</span> <span class='ident'>expected</span> {
+                           <span class='ident'>LessOrEqualThan</span>(<span class='ident'>expected</span>) <span class='op'>=&gt;</span> <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;less or equal than {}&quot;</span>, <span class='ident'>expected</span>),
+                           <span class='ident'>MoreThan</span>(<span class='ident'>expected</span>) <span class='op'>=&gt;</span> <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;more than {}&quot;</span>, <span class='ident'>expected</span>),
+                           <span class='ident'>EqualTo</span>(<span class='ident'>expected</span>) <span class='op'>=&gt;</span> <span class='ident'>expected</span>.<span class='ident'>to_string</span>(),
                        },
                        <span class='ident'>actual</span>)
             }
             <span class='ident'>OverflowError</span> <span class='op'>=&gt;</span> {
                 <span class='macro'>write</span><span class='macro'>!</span>(<span class='ident'>f</span>,
-                       <span class='string'>&quot;OverflowError: The size of the data structure surpasses the u32 max size \
-                        (4GB)&quot;</span>)
+                       <span class='string'>&quot;OverflowError: The size of the data structure surpasses the \
+                       max value of the integral generic type&quot;</span>)
             }
         }
     }
@@ -168,7 +172,7 @@
             <span class='ident'>BadSizeDecodeError</span> { .. } <span class='op'>=&gt;</span> {
                 <span class='string'>&quot;the size specified for the structure differs from the size of the given buffer&quot;</span>
             }
-            <span class='ident'>OverflowError</span> <span class='op'>=&gt;</span> <span class='string'>&quot;the size of the data structure surpasses the u32 max size&quot;</span>,
+            <span class='ident'>OverflowError</span> <span class='op'>=&gt;</span> <span class='string'>&quot;the size of the data structure surpasses max value of the size type&quot;</span>,
         }
     }
 

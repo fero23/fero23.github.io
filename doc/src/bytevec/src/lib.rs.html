@@ -171,6 +171,23 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
+<span id="130">130</span>
+<span id="131">131</span>
+<span id="132">132</span>
+<span id="133">133</span>
+<span id="134">134</span>
+<span id="135">135</span>
+<span id="136">136</span>
+<span id="137">137</span>
+<span id="138">138</span>
+<span id="139">139</span>
+<span id="140">140</span>
+<span id="141">141</span>
+<span id="142">142</span>
+<span id="143">143</span>
+<span id="144">144</span>
+<span id="145">145</span>
+<span id="146">146</span>
 </pre><pre class='rust '>
 <span class='doccomment'>//! bytevec: A Rust serialization library that uses byte vectors</span>
 <span class='doccomment'>//! ============================================================</span>
@@ -201,7 +218,7 @@
 <span class='doccomment'>//! goes `Ok`, we will be able to get a byte vector value that represents the </span>
 <span class='doccomment'>//! original data structure.</span>
 <span class='doccomment'>//! </span>
-<span class='doccomment'>//! bytevec doesn&#39;t actually do a 1-1 conversion of the bytes of the original</span>
+<span class='doccomment'>//! bytevec doesn&#39;t actually do a 1:1 conversion of the bytes of the original</span>
 <span class='doccomment'>//! type instance, as not every Rust type is stored on the stack. For any type</span>
 <span class='doccomment'>//! that wraps a heap stored value, it will give a representation of the </span>
 <span class='doccomment'>//! underlying value.</span>
@@ -236,21 +253,31 @@
 <span class='doccomment'>//! </span>
 <span class='doccomment'>//! - For a primitive type such as the integral types, floating points</span>
 <span class='doccomment'>//! or char that have fixed size, it will just grab the bytes and put them </span>
-<span class='doccomment'>//! on a `u8` buffer of the same length as the size of the type through</span>
-<span class='doccomment'>//! [`std::mem::transmute`][1]. These types are converted to and from big endian on</span>
+<span class='doccomment'>//! on a `u8` buffer of the same length as the size of the type through </span>
+<span class='doccomment'>//! [`std::mem::transmute`][1]. These types are converted to and from little endian on</span>
 <span class='doccomment'>//! serialization and deserialization respectively.</span>
 <span class='doccomment'>//! </span>
 <span class='doccomment'>//! - String and str don&#39;t store their byte count, it&#39;s up to their container (if any)</span>
 <span class='doccomment'>//! to store the size of the byte buffer of the string.</span>
 <span class='doccomment'>//! </span>
+<span class='doccomment'>//! - Complex data structures such as `struct`s, tuples and collections need to store</span>
+<span class='doccomment'>//! the sizes of their underlying data fields. These sizes are stored as values of a generic</span>
+<span class='doccomment'>//! integral type parameter `Size` that should be provided in every call of the methods of the</span>
+<span class='doccomment'>//! `ByteEncodable` and `ByteDecodable` traits. This type parameter is propagated to the</span>
+<span class='doccomment'>//! serialization and deserialization operations of the contained data fields. The type parameter</span>
+<span class='doccomment'>//! `Size` is constrained by the `BVSize` trait. Currently the types that implement this trait</span>
+<span class='doccomment'>//! are `u8`, `u16`, `u32` and `u64`. Users should select the type for the `Size` type parameter</span>
+<span class='doccomment'>//! according to the expected size of the byte buffer. If the expected size exceeds the </span>
+<span class='doccomment'>//! 2&lt;sup&gt;32&lt;/sup&gt; byte length limit of `u32`, use `u64` instead.</span>
+<span class='doccomment'>//! </span>
 <span class='doccomment'>//! - For structures with defined fields such as a custom `struct` or a tuple,</span>
-<span class='doccomment'>//! it will store the size of each field on an `u32` value in order at the start</span>
+<span class='doccomment'>//! it will store the size of each field on a sequence of `Size` values at the start</span>
 <span class='doccomment'>//! of the slice segment for the structure, followed by the actual bytes of </span>
 <span class='doccomment'>//! the values of the fields.</span>
 <span class='doccomment'>//! </span>
 <span class='doccomment'>//! - For any collection with variable length, it will first store the length</span>
-<span class='doccomment'>//! (in elements, not byte count) on an `u32` value, followed by the byte count</span>
-<span class='doccomment'>//! (yes, in `u32`) of each element, and then the actual values of the elements.</span>
+<span class='doccomment'>//! (in elements, not byte count) on a `Size` value, followed by the byte count</span>
+<span class='doccomment'>//! (yes, of `Size`) of each element, and then the actual values of the elements.</span>
 <span class='doccomment'>//! All of this done in order, order is important, the same order of serialization</span>
 <span class='doccomment'>//! is the order of deserialization.</span>
 <span class='doccomment'>//! </span>
@@ -266,15 +293,21 @@
 <span class='doccomment'>//! in a `BVDecodeResult`. If the size doesn&#39;t match, or if some other conversion problem </span>
 <span class='doccomment'>//! arises, it will yield a `ByteVecError` detailing the failure.</span>
 <span class='doccomment'>//! </span>
-<span class='doccomment'>//!  Almost all of the out of the box implementations of `ByteEncodable` also</span>
-<span class='doccomment'>//!  implement `ByteDecodable`, but some of them, particularly the slices and </span>
-<span class='doccomment'>//!  the tuple references don&#39;t make sense when deserialized, as they can&#39;t</span>
-<span class='doccomment'>//!  point to the original data they were referencing. This is usually a problem</span>
-<span class='doccomment'>//!  that requires some tweaking, but bytevec allows data conversion from byte</span>
-<span class='doccomment'>//!  buffers that were originally referenced data to a new instance of an owned data type,</span>
-<span class='doccomment'>//!  as long as the size requirements are the same. This way, slice data can</span>
-<span class='doccomment'>//!  be assigned to a `Vec` instance for example, as long as they share the same </span>
-<span class='doccomment'>//!  type of the underlying elements.</span>
+<span class='doccomment'>//! Almost all of the out of the box implementations of `ByteEncodable` also</span>
+<span class='doccomment'>//! implement `ByteDecodable`, but some of them, particularly the slices and </span>
+<span class='doccomment'>//! the tuple references don&#39;t make sense when deserialized, as they can&#39;t</span>
+<span class='doccomment'>//! point to the original data they were referencing. This is usually a problem</span>
+<span class='doccomment'>//! that requires some tweaking, but bytevec allows data conversion from byte</span>
+<span class='doccomment'>//! buffers that were originally referenced data to a new instance of an owned data type,</span>
+<span class='doccomment'>//! as long as the size requirements are the same. This way, slice data can</span>
+<span class='doccomment'>//! be assigned to a `Vec` instance for example, as long as they share the same </span>
+<span class='doccomment'>//! type of the underlying elements.</span>
+<span class='doccomment'>//! </span>
+<span class='doccomment'>//! The `ByteDecodable` trait also provides the `decode_max` method, which like `decode`, it</span>
+<span class='doccomment'>//! accepts the byte buffer to deserialize, but additionally, this method also accepts</span>
+<span class='doccomment'>//! a `limit` argument. This parameter is compared to the length of the `u8` buffer and</span>
+<span class='doccomment'>//! if the buffer length is greater than it, it will return a `BadSizeDecodeError`,</span>
+<span class='doccomment'>//! otherwise it will return the result of `decode` on the byte buffer.</span>
 <span class='doccomment'>//! </span>
 <span class='doccomment'>//! ###Example: Serialization and deserialization of a slice</span>
 <span class='doccomment'>//! </span>
@@ -285,8 +318,8 @@
 <span class='doccomment'>//! # use bytevec::{ByteEncodable, ByteDecodable};</span>
 <span class='doccomment'>//! # fn main() {</span>
 <span class='doccomment'>//! let slice = &amp;[&quot;Rust&quot;, &quot;Is&quot;, &quot;Awesome!&quot;];</span>
-<span class='doccomment'>//! let bytes = slice.encode().unwrap();</span>
-<span class='doccomment'>//! let vec = &lt;Vec&lt;String&gt;&gt;::decode(&amp;bytes).unwrap();</span>
+<span class='doccomment'>//! let bytes = slice.encode::&lt;u32&gt;().unwrap();</span>
+<span class='doccomment'>//! let vec = &lt;Vec&lt;String&gt;&gt;::decode::&lt;u32&gt;(&amp;bytes).unwrap();</span>
 <span class='doccomment'>//! assert_eq!(vec, slice);</span>
 <span class='doccomment'>//! # }</span>
 <span class='doccomment'>//! ```</span>
@@ -300,7 +333,8 @@
 
 <span class='kw'>pub</span> <span class='kw'>use</span> <span class='ident'>traits</span>::{<span class='ident'>ByteEncodable</span>, <span class='ident'>ByteDecodable</span>};
 <span class='kw'>pub</span> <span class='kw'>type</span> <span class='ident'>BVEncodeResult</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>, <span class='ident'>errors</span>::<span class='ident'>ByteVecError</span><span class='op'>&gt;</span>;
-<span class='kw'>pub</span> <span class='kw'>type</span> <span class='ident'>BVDecodeResult</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>, <span class='ident'>errors</span>::<span class='ident'>ByteVecError</span><span class='op'>&gt;</span>;</pre>
+<span class='kw'>pub</span> <span class='kw'>type</span> <span class='ident'>BVDecodeResult</span><span class='op'>&lt;</span><span class='ident'>T</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>T</span>, <span class='ident'>errors</span>::<span class='ident'>ByteVecError</span><span class='op'>&gt;</span>;
+<span class='kw'>pub</span> <span class='kw'>use</span> <span class='ident'>impls</span>::<span class='ident'>BVSize</span>;</pre>
 </section>
     <section id='search' class="content hidden"></section>
 

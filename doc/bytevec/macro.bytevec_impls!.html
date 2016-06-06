@@ -47,30 +47,47 @@
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a id='src-2471' class='srclink' href='../src/bytevec/src/macros.rs.html#28-110' title='goto source code'>[src]</a></span></h1>
+               </span><a id='src-2655' class='srclink' href='../src/bytevec/src/macros.rs.html#49-139' title='goto source code'>[src]</a></span></h1>
 <pre class='rust macro'>
 <span class='macro'>macro_rules</span><span class='macro'>!</span> <span class='ident'>bytevec_impls</span> {
-    {$($(<span class='attribute'>#[<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>attr</span>:<span class='ident'>meta</span>]</span>)<span class='op'>*</span> <span class='kw'>struct</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>name</span>:<span class='ident'>ident</span> {$(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>field</span>:<span class='ident'>ident</span> : <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>t</span>:<span class='ident'>ty</span>),<span class='op'>*</span>})<span class='op'>*</span>} <span class='op'>=&gt;</span> { ... };
+    {$(<span class='kw'>impl</span> <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>name</span>:<span class='ident'>ident</span> {$(<span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>field</span>:<span class='ident'>ident</span> : <span class='macro-nonterminal'>$</span><span class='macro-nonterminal'>t</span>:<span class='ident'>ty</span>),<span class='op'>*</span>})<span class='op'>*</span>} <span class='op'>=&gt;</span> { ... };
 }</pre>
-<div class='docblock'>
-<h3 id='the-bytevec_impls-macro' class='section-header'><a href='#the-bytevec_impls-macro'>The <code>bytevec_impls</code> macro</a></h3>
-<p>This macro allows the user to declare an arbitrary number of structures that
-automatically implement both the <code>ByteEncodable</code> and <code>ByteDecodable</code> traits,
-as long as all of the fields also implement both traits.</p>
+<div class='docblock'><p>Implements the byte serialization traits for the given structures.</p>
 
+<p>This macro implements both the <code>ByteEncodable</code> and <code>ByteDecodable</code> traits
+for the given <code>struct</code> definitions. This macro does not declare the <code>struct</code>
+definitions, the user should either declare them separately or use the
+<code>bytevec_decl</code> trait.</p>
+
+<p>This trait also allows the user to create a partial implementation of the
+serialization operations for a select number of the fields of the
+structure. If the actual definition of the <code>struct</code> has more fields than
+the one provided to the macro, only the listed fields in the macro invocation
+will be serialized and deserialized. In the deserialization process, the
+rest of the fields of the <code>struct</code> will be initialized using the value
+returned from the <a href="http://doc.rust-lang.org/stable/std/default/trait.Default.html#tymethod.default"><code>Default::default()</code></a> method, so the <code>struct</code> must 
+implement <a href="http://doc.rust-lang.org/stable/std/default/trait.Default.html"><code>Default</code></a>.</p>
+
+<h1 id='examples' class='section-header'><a href='#examples'>Examples</a></h1>
 <pre class='rust rust-example-rendered'>
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>PartialEq</span>, <span class='ident'>Eq</span>, <span class='ident'>Debug</span>, <span class='ident'>Default</span>)]</span>
+<span class='kw'>struct</span> <span class='ident'>Vertex3d</span> {
+    <span class='ident'>x</span>: <span class='ident'>u32</span>,
+    <span class='ident'>y</span>: <span class='ident'>u32</span>,
+    <span class='ident'>z</span>: <span class='ident'>u32</span>
+}
+
 <span class='macro'>bytevec_impls</span><span class='macro'>!</span> {
-    <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>PartialEq</span>, <span class='ident'>Eq</span>, <span class='ident'>Debug</span>)]</span>
-    <span class='kw'>struct</span> <span class='ident'>Point</span> {
+    <span class='kw'>impl</span> <span class='ident'>Vertex3d</span> {
         <span class='ident'>x</span>: <span class='ident'>u32</span>,
         <span class='ident'>y</span>: <span class='ident'>u32</span>
     }
 }
- 
+
 <span class='kw'>fn</span> <span class='ident'>main</span>() {
-    <span class='kw'>let</span> <span class='ident'>p1</span> <span class='op'>=</span> <span class='ident'>Point</span> {<span class='ident'>x</span>: <span class='number'>32</span>, <span class='ident'>y</span>: <span class='number'>436</span>};
-    <span class='kw'>let</span> <span class='ident'>bytes</span> <span class='op'>=</span> <span class='ident'>p1</span>.<span class='ident'>encode</span>().<span class='ident'>unwrap</span>();
-    <span class='kw'>let</span> <span class='ident'>p2</span> <span class='op'>=</span> <span class='ident'>Point</span>::<span class='ident'>decode</span>(<span class='kw-2'>&amp;</span><span class='ident'>bytes</span>).<span class='ident'>unwrap</span>();
+    <span class='kw'>let</span> <span class='ident'>p1</span> <span class='op'>=</span> <span class='ident'>Vertex3d</span> {<span class='ident'>x</span>: <span class='number'>32</span>, <span class='ident'>y</span>: <span class='number'>436</span>, <span class='ident'>z</span>: <span class='number'>0</span>};
+    <span class='kw'>let</span> <span class='ident'>bytes</span> <span class='op'>=</span> <span class='ident'>p1</span>.<span class='ident'>encode</span>::<span class='op'>&lt;</span><span class='ident'>u32</span><span class='op'>&gt;</span>().<span class='ident'>unwrap</span>();
+    <span class='kw'>let</span> <span class='ident'>p2</span> <span class='op'>=</span> <span class='ident'>Vertex3d</span>::<span class='ident'>decode</span>::<span class='op'>&lt;</span><span class='ident'>u32</span><span class='op'>&gt;</span>(<span class='kw-2'>&amp;</span><span class='ident'>bytes</span>).<span class='ident'>unwrap</span>();
     <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>p1</span>, <span class='ident'>p2</span>);
 }</pre>
 </div></section>

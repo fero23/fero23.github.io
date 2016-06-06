@@ -47,7 +47,7 @@
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a id='src-0' class='srclink' href='../src/bytevec/src/lib.rs.html#1-129' title='goto source code'>[src]</a></span></h1>
+               </span><a id='src-0' class='srclink' href='../src/bytevec/src/lib.rs.html#1-146' title='goto source code'>[src]</a></span></h1>
 <div class='docblock'>
 <h1 id='bytevec-a-rust-serialization-library-that-uses-byte-vectors' class='section-header'><a href='#bytevec-a-rust-serialization-library-that-uses-byte-vectors'>bytevec: A Rust serialization library that uses byte vectors</a></h1>
 <p>bytevec takes advantage of Rust&#39;s concise and stable type system to
@@ -75,7 +75,7 @@ returns the vector wrapped around a <code>BVEncodeResult</code> instance. If eve
 goes <code>Ok</code>, we will be able to get a byte vector value that represents the 
 original data structure.</p>
 
-<p>bytevec doesn&#39;t actually do a 1-1 conversion of the bytes of the original
+<p>bytevec doesn&#39;t actually do a 1:1 conversion of the bytes of the original
 type instance, as not every Rust type is stored on the stack. For any type
 that wraps a heap stored value, it will give a representation of the 
 underlying value.</p>
@@ -105,18 +105,27 @@ rules when translating some type value to bytes:</p>
 <ul>
 <li><p>For a primitive type such as the integral types, floating points
 or char that have fixed size, it will just grab the bytes and put them 
-on a <code>u8</code> buffer of the same length as the size of the type through
-<a href="http://doc.rust-lang.org/stable/std/mem/fn.transmute.html"><code>std::mem::transmute</code></a>. These types are converted to and from big endian on
+on a <code>u8</code> buffer of the same length as the size of the type through 
+<a href="http://doc.rust-lang.org/stable/std/mem/fn.transmute.html"><code>std::mem::transmute</code></a>. These types are converted to and from little endian on
 serialization and deserialization respectively.</p></li>
 <li><p>String and str don&#39;t store their byte count, it&#39;s up to their container (if any)
 to store the size of the byte buffer of the string.</p></li>
+<li><p>Complex data structures such as <code>struct</code>s, tuples and collections need to store
+the sizes of their underlying data fields. These sizes are stored as values of a generic
+integral type parameter <code>Size</code> that should be provided in every call of the methods of the
+<code>ByteEncodable</code> and <code>ByteDecodable</code> traits. This type parameter is propagated to the
+serialization and deserialization operations of the contained data fields. The type parameter
+<code>Size</code> is constrained by the <code>BVSize</code> trait. Currently the types that implement this trait
+are <code>u8</code>, <code>u16</code>, <code>u32</code> and <code>u64</code>. Users should select the type for the <code>Size</code> type parameter
+according to the expected size of the byte buffer. If the expected size exceeds the 
+2<sup>32</sup> byte length limit of <code>u32</code>, use <code>u64</code> instead.</p></li>
 <li><p>For structures with defined fields such as a custom <code>struct</code> or a tuple,
-it will store the size of each field on an <code>u32</code> value in order at the start
+it will store the size of each field on a sequence of <code>Size</code> values at the start
 of the slice segment for the structure, followed by the actual bytes of 
 the values of the fields.</p></li>
 <li><p>For any collection with variable length, it will first store the length
-(in elements, not byte count) on an <code>u32</code> value, followed by the byte count
-(yes, in <code>u32</code>) of each element, and then the actual values of the elements.
+(in elements, not byte count) on a <code>Size</code> value, followed by the byte count
+(yes, of <code>Size</code>) of each element, and then the actual values of the elements.
 All of this done in order, order is important, the same order of serialization
 is the order of deserialization.</p></li>
 <li><p>All serializable values can be nested, so any structure that implements 
@@ -133,20 +142,26 @@ in a <code>BVDecodeResult</code>. If the size doesn&#39;t match, or if some othe
 arises, it will yield a <code>ByteVecError</code> detailing the failure.</p>
 
 <p>Almost all of the out of the box implementations of <code>ByteEncodable</code> also
- implement <code>ByteDecodable</code>, but some of them, particularly the slices and 
- the tuple references don&#39;t make sense when deserialized, as they can&#39;t
- point to the original data they were referencing. This is usually a problem
- that requires some tweaking, but bytevec allows data conversion from byte
- buffers that were originally referenced data to a new instance of an owned data type,
- as long as the size requirements are the same. This way, slice data can
- be assigned to a <code>Vec</code> instance for example, as long as they share the same 
- type of the underlying elements.</p>
+implement <code>ByteDecodable</code>, but some of them, particularly the slices and 
+the tuple references don&#39;t make sense when deserialized, as they can&#39;t
+point to the original data they were referencing. This is usually a problem
+that requires some tweaking, but bytevec allows data conversion from byte
+buffers that were originally referenced data to a new instance of an owned data type,
+as long as the size requirements are the same. This way, slice data can
+be assigned to a <code>Vec</code> instance for example, as long as they share the same 
+type of the underlying elements.</p>
+
+<p>The <code>ByteDecodable</code> trait also provides the <code>decode_max</code> method, which like <code>decode</code>, it
+accepts the byte buffer to deserialize, but additionally, this method also accepts
+a <code>limit</code> argument. This parameter is compared to the length of the <code>u8</code> buffer and
+if the buffer length is greater than it, it will return a <code>BadSizeDecodeError</code>,
+otherwise it will return the result of <code>decode</code> on the byte buffer.</p>
 
 <h3 id='example-serialization-and-deserialization-of-a-slice' class='section-header'><a href='#example-serialization-and-deserialization-of-a-slice'>Example: Serialization and deserialization of a slice</a></h3>
 <pre class='rust rust-example-rendered'>
 <span class='kw'>let</span> <span class='ident'>slice</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span>[<span class='string'>&quot;Rust&quot;</span>, <span class='string'>&quot;Is&quot;</span>, <span class='string'>&quot;Awesome!&quot;</span>];
-<span class='kw'>let</span> <span class='ident'>bytes</span> <span class='op'>=</span> <span class='ident'>slice</span>.<span class='ident'>encode</span>().<span class='ident'>unwrap</span>();
-<span class='kw'>let</span> <span class='ident'>vec</span> <span class='op'>=</span> <span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;&gt;</span>::<span class='ident'>decode</span>(<span class='kw-2'>&amp;</span><span class='ident'>bytes</span>).<span class='ident'>unwrap</span>();
+<span class='kw'>let</span> <span class='ident'>bytes</span> <span class='op'>=</span> <span class='ident'>slice</span>.<span class='ident'>encode</span>::<span class='op'>&lt;</span><span class='ident'>u32</span><span class='op'>&gt;</span>().<span class='ident'>unwrap</span>();
+<span class='kw'>let</span> <span class='ident'>vec</span> <span class='op'>=</span> <span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;&gt;</span>::<span class='ident'>decode</span>::<span class='op'>&lt;</span><span class='ident'>u32</span><span class='op'>&gt;</span>(<span class='kw-2'>&amp;</span><span class='ident'>bytes</span>).<span class='ident'>unwrap</span>();
 <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='ident'>vec</span>, <span class='ident'>slice</span>);</pre>
 </div><h2 id='modules' class='section-header'><a href="#modules">Modules</a></h2>
 <table>
@@ -159,25 +174,39 @@ arises, it will yield a <code>ByteVecError</code> detailing the failure.</p>
                        </tr></table><h2 id='macros' class='section-header'><a href="#macros">Macros</a></h2>
 <table>
                        <tr class=' module-item'>
+                           <td><a class='macro' href='macro.bytevec_decl!.html'
+                                  title='bytevec::bytevec_decl!'>bytevec_decl!</a></td>
+                           <td class='docblock short'>
+                                <p>Declares the given structures and implements the byte serialization traits.</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
                            <td><a class='macro' href='macro.bytevec_impls!.html'
                                   title='bytevec::bytevec_impls!'>bytevec_impls!</a></td>
                            <td class='docblock short'>
-                                
+                                <p>Implements the byte serialization traits for the given structures.</p>
                            </td>
                        </tr></table><h2 id='traits' class='section-header'><a href="#traits">Traits</a></h2>
 <table>
                        <tr class=' module-item'>
+                           <td><a class='trait' href='trait.BVSize.html'
+                                  title='bytevec::BVSize'>BVSize</a></td>
+                           <td class='docblock short'>
+                                <p>Represents the generic integral type of the structure size indicators</p>
+                           </td>
+                       </tr>
+                       <tr class=' module-item'>
                            <td><a class='trait' href='trait.ByteDecodable.html'
                                   title='bytevec::ByteDecodable'>ByteDecodable</a></td>
                            <td class='docblock short'>
-                                
+                                <p>Provides deserialization functionality for the implementing types.</p>
                            </td>
                        </tr>
                        <tr class=' module-item'>
                            <td><a class='trait' href='trait.ByteEncodable.html'
                                   title='bytevec::ByteEncodable'>ByteEncodable</a></td>
                            <td class='docblock short'>
-                                
+                                <p>Provides serialization functionality for the implementing types.</p>
                            </td>
                        </tr></table><h2 id='types' class='section-header'><a href="#types">Type Definitions</a></h2>
 <table>
